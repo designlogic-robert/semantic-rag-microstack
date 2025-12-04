@@ -1,36 +1,49 @@
+# src/semantic_rag/llm.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import List
 from dotenv import load_dotenv
 from openai import OpenAI
+import os
 
-MODEL = "gpt-4.1-mini"
+# Load .env from project root
+ROOT_ENV = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(ROOT_ENV)
 
-_client: OpenAI | None = None
+MODEL_NAME = "gpt-4.1-mini"  # or whatever chat model you want
 
-
-def _get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        load_dotenv()
-        _client = OpenAI()
-    return _client
+client = OpenAI()
 
 
-def answer(query: str, contexts: list[str]) -> str:
-    client = _get_client()
-    context_text = "\n\n".join(f"- {c}" for c in contexts)
+def answer_query(query: str, context_chunks: List[str]) -> str:
+    """
+    Given a user query and a list of retrieved context chunks,
+    call the LLM and return a synthesized answer.
+    """
 
-    prompt = (
-        "You are an AI assistant that explains the Universal Semantic Systems "
-        "architecture and related concepts clearly.\n\n"
-        "Use ONLY the following context snippets. If something is missing, say so "
-        "instead of guessing.\n\n"
-        f"Context:\n{context_text}\n\n"
-        f"Question: {query}\n\n"
-        "Answer in clear, concrete language in 2–4 short paragraphs."
+    # Join the chunks into a single context block
+    context = "\n\n---\n\n".join(context_chunks)
+
+    system_prompt = (
+        "You are an AI assistant helping explain the Universal Semantic Systems (USS) "
+        "architecture. Use ONLY the provided context to answer. "
+        "If the answer is not in the context, say you don't know."
+    )
+
+    user_prompt = (
+        f"Context:\n{context}\n\n"
+        f"User question:\n{query}\n\n"
+        "Answer in clear, straightforward language."
     )
 
     resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.2,
     )
 
     return resp.choices[0].message.content.strip()
