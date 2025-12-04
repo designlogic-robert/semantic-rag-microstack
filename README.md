@@ -1,120 +1,176 @@
 # Semantic RAG Microstack
 
-A lightweight Retrieval-Augmented Generation pipeline designed to demonstrate semantic architecture principles from USS: UST, USR, USE, SynCE, SCP, ORCH-C, and the Semantic Token + Posture model.
+A minimal, **production-style** Retrieval-Augmented Generation (RAG) service.
 
-## Why This Exists
+This repo shows how to:
 
-Most RAG demos are shallow. This microstack shows how your higher-order architecture ideas behave in an actual working retrieval pipeline:
+- Ingest raw text into chunks
+- Embed those chunks with OpenAI
+- Index them with FAISS
+- Expose a clean FastAPI endpoint for semantic questions
 
-- UST (Universal Semantic Token Model)
-- USR (Universal Semantic Runtime)
-- USE (Universal Semantic Engine)
-- SynCE (Synthetic Cognitive Engine)
-- SCP (Semantic Control Protocol)
-- ORCH-C (Deterministic Planner)
-- Semantic Tokens + Posture System
+It’s intentionally small so you can read it end-to-end in one sitting and still see all the moving parts of a real RAG pipeline.
 
-Founders evaluating AI engineers get a concrete demonstration of:
+---
 
-- architecture-level understanding  
-- semantic modeling  
-- retrieval pipelines  
-- vector indexing  
-- API engineering  
-- clean, deterministic reasoning  
+## What this microstack proves
 
-## Features
+From a founder / hiring-manager perspective, this repo demonstrates that you can:
 
-- Local FAISS vector index  
-- Simple ingestion pipeline (data.txt → FAISS)  
-- LLM integration (OpenAI or any API-compatible model)  
-- FastAPI server with a single `/query` endpoint  
-- Retrieval + synthesis pipeline  
-- Explains USS architecture back to the user  
+1. **Design a clean, modular RAG pipeline**
+   - Separate ingest, retrieval, and LLM orchestration
+   - Use FAISS and OpenAI correctly, without leaking secrets
 
-## File Structure
+2. **Ship a small, production-shaped microservice**
+   - FastAPI + uvicorn
+   - Clear I/O contract (`/query` endpoint, typed request/response models)
+   - Artifacts and secrets handled via `.gitignore` and `.env`
 
-```
-├── data.txt
-├── ingest.py
-├── retriever.py
-├── llm.py
-├── api.py
+3. **Explain the architecture like an engineer, not a vibes coder**
+   - Every file has a single, obvious responsibility
+   - The stack is easy to extend into a bigger “Semantic Runtime” later
+
+---
+
+## Architecture
+
+**Directories and files:**
+
+```text
+semantic-rag-microstack/
+├── .gitignore
 ├── requirements.txt
-└── README.md
+├── README.md
+└── src/
+    └── semantic_rag/
+        ├── api.py         # FastAPI app and /query endpoint
+        ├── data.txt       # Source corpus to index (plain text)
+        ├── ingest.py      # Build FAISS index + docs.npy from data.txt
+        ├── llm.py         # LLM wrapper for answering with context chunks
+        ├── query.py       # CLI helper to test the pipeline
+        ├── retriever.py   # FAISS-based semantic retriever
+        ├── faiss.index    # (ignored) FAISS index artifact
+        └── docs.npy       # (ignored) Chunked text store
 ```
-## Installation
+### High-level flow:
 
-### 1. Clone the Repo
-```bash
-git clone https://github.com/<your-username>/semantic-rag-microstack
+1. #### Ingest
+    - `ingest.py` reads `data.txt`
+    - Splits into chunks
+    - Embeds chunks with `text-embedding-3-small`
+    - Stores vectors in `faiss.index`
+    - Stores chunk texts in `docs.npy`
+
+2. #### Retrieve
+    - `retriever.py` loads `faiss.index` + `docs.npy`
+    - Given a query, embeds it and performs vector search
+    - Returns top-k chunks (and optionally scores)
+
+3. #### Answer
+    - `llm.py` wraps the OpenAI Chat Completions API
+    - Given `query` + `context_chunks`, it prompts a chat model (e.g. `gpt-4.1-mini`)
+    - Returns a concise, context-grounded answer
+
+4. #### Serve
+    - `api.py` exposes `/query` via FastAPI
+    - Request: `{ "query": "..." , "top_k": 4 }`
+    - Response: `{ "answer": "..." }`
+
+## Setup
+1. ### Clone and enter the project
+```
+git clone https://github.com/<your-username>/semantic-rag-microstack.git
 cd semantic-rag-microstack
 ```
-### 2. Create & Activate Virtual Environment
+2. ### Create a virtual environment
 ```
 python -m venv .venv
-source .venv/Scripts/activate
+source .venv/bin/activate      # macOS / Linux
+# or
+.venv\Scripts\activate         # Windows
 ```
-### 3. Install Dependencies
+3. ### Install dependencies
 ```
 pip install -r requirements.txt
 ```
-### 4. Add Your OpenAI Key
-Create a file named `.env`:
+4. ### Configure environment variables
+Create a `.env` file in the project root (same folder as `README.md`):
 ```
-OPENAI_API_KEY=your_key_here
+OPENAI_API_KEY=sk-your-real-key-here
 ```
-### Build the Vector Index
+The `.env` file is ignored by git via `.gitignore` so your secret key never leaves your machine.
+
+## Usage
+### Step 1 – Prepare your data
+Edit `src/semantic_rag/data.txt` with whatever corpus you want to index
+(e.g. your own architecture notes, product docs, FAQs).
+
+### Step 2 – Build the index
+From the project root:
 ```
+cd src/semantic_rag
 python ingest.py
+cd ../../
 ```
-This reads `data.txt`, chunks it, embeds it, builds a FAISS index, and writes `faiss.index`.
+You should see log output similar to:
+```
+Chunked into N pieces
+Saved index to faiss.index
+Saved chunk texts to docs.npy
+```
+### Step 3 – Run the API
+From the project root:
 
-### Run the API
 ```
-uvicorn api:app --reload
+uvicorn src.semantic_rag.api:app --reload
 ```
-Server runs at:
-```
-http://127.0.0.1:8000/query
-```
+You should see FastAPI / uvicorn startup logs.
 
-### Query the Model
-POST JSON:
+### Step 4 – Send a test query
+In another terminal (still in the project root):
 ```
-{
-  "query": "Explain ORCH-C in simple terms."
-}
-```
+curl -X POST "http://127.0.0.1:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the Universal Semantic Runtime?"}'
+  ```
 Example response:
 ```
 {
-  "answer": "ORCH-C is the deterministic planner inside USS. It routes meaning with posture-aware constraints."
+  "answer": "The Universal Semantic Runtime (USR) is a core layer in the Universal Semantic Systems architecture that handles planning, routing, and governance over semantic operations."
 }
 ```
-### What This Demonstrates to Founders
-This repo shows that you can:
-1. Build functional AI pipelines
-2. Work with embeddings, vector search, and RAG
-3. Structure clean, modular Python services
-4. Explain complex systems clearly
-5. Deliver production-ready microservices
+You can also use the built-in CLI helper:
 
-### Extending the Microstack
-You can add:
-- PDF/Markdown ingestion
-- Multi-file retrieval
-- Query decomposition
-- Structured output formats
-- Agent-style orchestration
-- Caching or reranking
+```
+cd src/semantic_rag
+python query.py "What is the Universal Semantic Runtime?"
+cd ../../
+```
+## Configuration
+You can customize model choices in:
+- `retriever.py`
+  - `EMBEDDING_MODEL = "text-embedding-3-small"`
+- `llm.py`
+  - `MODEL_NAME = "gpt-4.1-mini"`
 
-### License
-MIT License.
+Both modules load the `OPENAI_API_KEY` from `.env` using `python-dotenv`.
 
-### Author
-Robert Hansen
-- Chief Semantic Architect - Universal Semantic Systems
-- GitHub: https://github.com/designlogic-robert
-- LinkedIn: https://linkedin.com/in/roberthansen-ai
+## Extending this microstack
+Some natural next steps:
+- #### Multi-file ingestion
+    - Walk a directory, ingest all `.md` / `.txt`files.
+- #### Return sources in the API response
+    - Include chunk text, index, and score for transparency.
+- #### Simple reranking
+    - Re-order retrieved chunks with a second pass if needed.
+- #### Auth & rate limiting
+    - Add API keys or JWT, basic rate limiting, and logging.
+- #### Metrics
+    - Log queries, response latency, and token usage.
 
+This repo is deliberately small so you can evolve it into:
+- A mini semantic runtime for a single product
+- A reference microservice inside a larger USS/USR stack
+
+## License
+MIT License. Use it, fork it, extend it.
