@@ -1,0 +1,12 @@
+Universal Semantic Systems (USS) is a semantic runtime stack for deterministic AI behavior. 
+Core layers include:
+
+- UST (Universal Semantic Token Model): canonical schema for semantic tokens.
+- USR (Universal Semantic Runtime): planning, routing, and governance over semantic operations.
+- USE (Universal Semantic Engine): core reasoning engine that executes plans.
+- SynCE (domain engine): domain-specific cognition for applied use cases.
+- SCP (Semantic Control Protocol): orchestration and control language for flows.
+- ORCH-C (deterministic planner): central orchestrator that converts semantic tokens into execution plans.
+
+This demo shows how USS concepts can be indexed with a RAG pipeline and queried through an API.
+You can add more detailed notes here about ORCH-C, SCP, SynCE, and your architectural decisions.
